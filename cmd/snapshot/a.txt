@@ -1,8 +1,0 @@
-	//filename := "/tmp/etcd-backup-20231021.tar.gz"
-	//secretID := "AKIDrXAYotqJrGWaYJxdO6nQrnkY7QYUFWkM"
-	//secretKey := "hP0a5vpttNrAHSYUE5qOl7VwNhqzxmU9"
-	//region := "ap-beijing"
-	//bucketName := "etcd-1308765018"
-
-	执行命令
-	oss.go -f etcd-backup-20231021.tar.gz -type download -ak AKIDrXAYotqJrGWaYJxdO6nQrnkY7QYUFWkM -sk hP0a5vpttNrAHSYUE5qOl7VwNhqzxmU9 -region ap-beijing -bucket etcd-1308765018
