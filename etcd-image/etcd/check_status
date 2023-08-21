@@ -1,0 +1,8 @@
+HOSTNAME=$(hostname)
+CLUSTER_NAME=${HOSTNAME%-*}
+ESP=""
+for i in $(seq 0 $((${INITIAL_CLUSTER_SIZE} - 1))); do
+  ESP="${ESP}${ESP:+,}${CLUSTER_NAME}-${i}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2379"
+done
+echo ${ESP}
+ETCDCTL_API=3 etcdctl --endpoints ${ESP} endpoint status --write-out=table

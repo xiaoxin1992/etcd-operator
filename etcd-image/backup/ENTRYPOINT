@@ -1,0 +1,16 @@
+#! /bin/bash
+##########################################################
+#           用于备份和恢复etcd, 请定义下面环境变量
+#           OPTIONTYPE   备份或者恢复{backup, restore}
+#           FILENAME     备份文件名,恢复远程文件的文件名
+#           AK           腾讯云的secretID
+#           SK           腾讯云的secretKey
+#           REGION       cos所在的区域
+#           BUCKET        bucket名称
+#           ENDPOINTS     etcd 连接地址
+##########################################################
+backup() {
+  echo "start backup etcd..."
+  /opt/snapshot
+}
+backup

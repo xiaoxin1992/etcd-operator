@@ -1,0 +1,24 @@
+#! /bin/bash
+HOSTNAME=$(hostname)
+CLUSTER_NAME=${HOSTNAME%-*}
+member_hash() {
+  etcdctl member list | grep -w "$HOSTNAME" | awk '{ print $1}' | awk -F "," '{ print $1}'
+}
+eps() {
+  EPS=""
+  for i in $(seq 0 $((${INITIAL_CLUSTER_SIZE} - 1))); do
+    EPS="${EPS}${EPS:+,}http://${CLUSTER_NAME}-${i}.${SERVICE_NAME}.${MY_NAMESPACE}.svc.cluster.local:2379"
+  done
+  echo ${EPS}
+}
+export ETCDCTL_ENDPOINTS=$(eps)
+SET_ID=${HOSTNAME##*-}
+# Removing member from cluster
+if [ "${SET_ID}" -ge ${INITIAL_CLUSTER_SIZE} ]; then
+  echo "Removing ${HOSTNAME} from etcd cluster"
+  etcdctl member remove $(member_hash)
+  if [ $? -eq 0 ]; then
+    # Remove everything otherwise the cluster will no longer scale-up
+    rm -rf /var/run/etcd/*
+  fi
+fi

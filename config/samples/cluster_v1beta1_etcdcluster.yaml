@@ -1,0 +1,55 @@
+apiVersion: cluster.etcd.io/v1beta1
+kind: EtcdCluster
+metadata:
+  labels:
+    app.kubernetes.io/name: etcdcluster
+    app.kubernetes.io/instance: etcdcluster-sample
+    app.kubernetes.io/part-of: etcd-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: etcd-operator
+  name: etcdcluster-sample
+spec:
+  ports:
+    - name: client
+      protocol: TCP
+      port: 2379
+      targetPort: 2379
+    - name: peer
+      protocol: TCP
+      port: 2380
+      targetPort: 2380
+  selector:
+    matchLabels:
+      app: etcd
+  serviceName: "my-etcd"
+  replicas: 3
+  template:
+    labels:
+      app: etcd
+    spec:
+      containers:
+        - name: etcd
+          image: joinlulu/etcd-operator:v3.5.0
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 2380
+              name: peer
+            - name: client
+              containerPort: 2379
+          env:
+            - name: MY_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: INITIAL_CLUSTER_SIZE
+              value: "3"                     # 初始化节点数量, 新集群创建的时候需要，修改副本的时候则不需要修改
+            - name: SERVICE_NAME
+              value: "my-etcd"               # 需要跟serviceName保持一致，表示service名称，用户拼接访问连接
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/bash", "-ec", "/opt/PRESTOP"]

@@ -1,0 +1,81 @@
+#! /bin/bash
+
+######################################################
+#   MY_NAMESPACE="defualt"      当前POD命名空间
+#   INITIAL_CLUSTER_SIZE=3      集群节点数量，必须是奇数
+#   CLUSTER_TOKEN="new-clutesr" 集群初始化Token
+#   CLUSTER_NAME=name1          集群名称
+#   SERVICE_NAME=nginx          service名称
+#   POD_IP=172.0.0.10           Pod的IP地址
+#   以上变量集群内置，不需要手写
+######################################################
+
+
+HOSTNAME=$(hostname)
+ETCD_DATA=${ETCD_DATA:-"/var/run/etcd/default.etcd"}
+CLUSTER_NAME=${HOSTNAME%-*}
+CLUSTER_TOKEN=${CLUSTER_NAME}
+function eps() {
+  EPS=""
+  # shellcheck disable=SC2003
+  d=$(expr "${INITIAL_CLUSTER_SIZE}" - 1)
+  for i in $(seq 0 $((${INITIAL_CLUSTER_SIZE} - 1))); do
+    EPS="${EPS}${EPS:+,}http://${CLUSTER_NAME}-${i}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2379"
+  done
+  echo "${EPS}"
+}
+
+function member_hash() {
+   etcdctl member list | grep -w "$HOSTNAME" | awk '{ print $1}' | awk -F "," '{ print $1}'
+}
+
+
+function initial_peers() {
+  PEERS=""
+  for i in $(seq 0 $((${INITIAL_CLUSTER_SIZE} - 1))); do
+    PEERS="${PEERS}${PEERS:+,}${CLUSTER_NAME}-${i}=http://${CLUSTER_NAME}-${i}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2380"
+  done
+  echo "${PEERS}"
+}
+
+# etcd-SET_ID
+SET_ID=${HOSTNAME##*-}
+
+if [ "${SET_ID}" -ge ${INITIAL_CLUSTER_SIZE} ];then
+	export ETCDCTL_ENDPOINTS=$(eps)
+	# member already added?
+	MEMBER_HASH=$(member_hash)
+	if [ -n "${MEMBER_HASH}" ]; then
+		# the member hash exists but for some reason etcd failed
+		# as the datadir has not be created, we can remove the member
+		# and retrieve new hash
+		echo "Remove member ${MEMBER_HASH}"
+		etcdctl --endpoints=$(eps) member remove ${MEMBER_HASH}
+	fi
+	echo "Adding new member"
+	echo "etcdctl --endpoints=$(eps) member add ${HOSTNAME} --peer-urls=http://${HOSTNAME}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2380"
+	etcdctl member --endpoints=$(eps) add ${HOSTNAME} --peer-urls=http://${HOSTNAME}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2380 | grep "^ETCD_" > /var/run/etcd/new_member_envs
+	if [ $? -ne 0 ]; then
+		echo "member add ${HOSTNAME} error."
+		rm -f /var/run/etcd/new_member_envs
+		exit 1
+	fi
+	echo "==> Loading env vars of existing cluster..."
+	sed -ie "s/^/export /" /var/run/etcd/new_member_envs
+	cat /var/run/etcd/new_member_envs
+	. /var/run/etcd/new_member_envs
+	echo "etcd --name ${HOSTNAME} --initial-advertise-peer-urls ${ETCD_INITIAL_ADVERTISE_PEER_URLS} --listen-peer-urls http://${POD_IP}:2380 --listen-client-urls http://${POD_IP}:2379,http://127.0.0.1:2379 --advertise-client-urls http://${HOSTNAME}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2379 --data-dir ${ETCD_DATA} --initial-cluster ${ETCD_INITIAL_CLUSTER} --initial-cluster-state ${ETCD_INITIAL_CLUSTER_STATE}"
+  exec etcd --listen-peer-urls http://${POD_IP}:2380 --listen-client-urls http://${POD_IP}:2379,http://127.0.0.1:2379 --advertise-client-urls http://${HOSTNAME}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2379 --data-dir ${ETCD_DATA}
+fi
+
+for i in $(seq 0 $((${INITIAL_CLUSTER_SIZE} - 1))); do
+  while true; do
+	  echo "Waiting for ${CLUSTER_NAME}-${i}.${SERVICE_NAME}.${MY_NAMESPACE}.svc to come up"
+		ping -W 1 -c 1 ${CLUSTER_NAME}-${i}.${SERVICE_NAME}.${MY_NAMESPACE}.svc > /dev/null && break
+		sleep 1s
+	done
+done
+
+echo "join member ${HOSTNAME}"
+# join member
+exec etcd --name ${HOSTNAME} --initial-advertise-peer-urls http://${HOSTNAME}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2380 --listen-peer-urls http://${POD_IP}:2380 --listen-client-urls http://${POD_IP}:2379,http://127.0.0.1:2379 --advertise-client-urls http://${HOSTNAME}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2379 --initial-cluster-token ${CLUSTER_TOKEN} --data-dir ${ETCD_DATA} --initial-cluster $(initial_peers) --initial-cluster-state new
