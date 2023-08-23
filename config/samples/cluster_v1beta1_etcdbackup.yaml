@@ -9,4 +9,24 @@ metadata:
     app.kubernetes.io/created-by: etcd-operator
   name: etcdbackup-sample
 spec:
-  # TODO(user): Add fields here
+  endpoints: "etcdcluster-sample-etcd-0.my-etcd.default.svc:2379"
+  cos:
+    bucket: "etcd-1308765018"
+    filename: "etcd-snapshot.db"
+    path: "/"
+    region: "ap-beijing"
+    secretId: "AKIDrXAYotqJrGWaYJxdO6nQrnkY7QYUFWkM"
+    secretKey: "hP0a5vpttNrAHSYUE5qOl7VwNhqzxmU9"
+  job:
+#    concurrencyPolicy: Forbid
+    schedule: "*/1 * * * *"
+    jobTemplate:
+      spec:
+        template:
+          spec:
+            containers:
+              - name: hello
+                image: joinlulu/etcd-backup:latest
+                imagePullPolicy: Always
+            restartPolicy: OnFailure
+

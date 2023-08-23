@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /bin/sh
 ##########################################################
 #           用于备份和恢复etcd, 请定义下面环境变量
 #           OPTIONTYPE   备份或者恢复{backup, restore}
@@ -9,8 +9,5 @@
 #           BUCKET        bucket名称
 #           ENDPOINTS     etcd 连接地址
 ##########################################################
-backup() {
-  echo "start backup etcd..."
-  /opt/snapshot
-}
-backup
+echo "start backup etcd..."
+./backup

@@ -1,11 +1,14 @@
 FROM golang:1.20 as builder
+ARG TARGETOS
+ARG TARGETARCH
 WORKDIR /opt
 RUN export GOPROXY="https://proxy.golang.com.cn,direct"
 RUN git clone https://github.com/xiaoxin1992/etcd-operator.git
-RUN cd etcd-operator && go build -o snapshot cmd/snapshot/main.go && ls
+RUN cd etcd-operator && CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o snap snapshot/main.go && ls
 
-FROM ubuntu:20.04
+FROM alpine:3.18.3
 WORKDIR /opt
-COPY --from=builder /opt/etcd-operator/snapshot /opt
-COPY ENTRYPOINT ./opt/
-CMD [ "./opt/ENTRYPOINT" ]
+COPY --from=builder /opt/etcd-operator/snap ./backup
+COPY ENTRYPOINT ./
+CMD ["/opt/ENTRYPOINT" ]
+
