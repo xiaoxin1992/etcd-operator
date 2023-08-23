@@ -10,11 +10,28 @@ You’ll need a Kubernetes cluster to run against. You can use [KIND](https://si
 
 ### 构建etcd镜像
 ```sh
-docker build -t etcd-backup:latest  etcd-image/backup
+docker build -t etcd:v3.5.0  etcd-image/etcd
 ```
+
+### 多平台构建etcd镜像
+```she
+docker buildx create --name mybuilder
+docker buildx use mybuilder
+docker buildx build --platform linux/arm64,linux/amd64  -t joinlulu/v3.5.0  etcd-image/backup --push
+docker buildx  rm mybuilder
+```
+
 ### 构建etc备份镜像
 ```sh
 docker build -t etcd-backup:latest  etcd-image/backup
+```
+
+### 多平台构建etcd备份镜像
+```she
+docker buildx create --name mybuilder
+docker buildx use mybuilder
+docker buildx build --platform linux/arm64,linux/amd64  -t etcd-backu:latest  etcd-image/backup --push
+docker buildx  rm mybuilder
 ```
 
 ### Running on the cluster
