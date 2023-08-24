@@ -15,8 +15,8 @@ spec:
     filename: "etcd-snapshot.db"
     path: "/"
     region: "ap-beijing"
-    secretId: "AKIDrXAYotqJrGWaYJxdO6nQrnkY7QYUFWkM"
-    secretKey: "hP0a5vpttNrAHSYUE5qOl7VwNhqzxmU9"
+    secretId: "AKIDrXAYotqJrGWaYJxdO6nQrnkY"
+    secretKey: "hP0a5vpttNrAHSYUE5qOl7V"
   job:
 #    concurrencyPolicy: Forbid
     schedule: "*/1 * * * *"

@@ -1,3 +1,48 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-local
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /data/etcd  # node1节点上的目录
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - node01.k8s.com
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    app: etcd
+  name: etcd-data
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-storage
+  resources:
+    requests:
+      storage: 10Gi
+---
 apiVersion: cluster.etcd.io/v1beta1
 kind: EtcdCluster
 metadata:
@@ -8,6 +53,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: etcd-operator
   name: etcdcluster-sample
+  namespace: default
 spec:
   ports:
     - name: client
@@ -49,7 +95,14 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
+          volumeMounts:
+            - name: etcd-data
+              mountPath: /var/run/etcd
           lifecycle:
             preStop:
               exec:
                 command: ["/bin/bash", "-ec", "/opt/PRESTOP"]
+      volumes:
+        - name: etcd-data
+          persistentVolumeClaim:
+            claimName: etcd-data

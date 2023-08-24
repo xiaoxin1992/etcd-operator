@@ -9,7 +9,8 @@
 ######################################################
 
 HOSTNAME=$(hostname)
-ETCD_DATA=${ETCD_DATA:-"/var/run/etcd/default.etcd"}
+BASEDIR="/var/run/etcd/${HOSTNAME}"
+ETCD_DATA=${ETCD_DATA:-"${BASEDIR}/default.etcd"}
 CLUSTER_NAME=${HOSTNAME%-*}
 CLUSTER_TOKEN=${CLUSTER_NAME}-token
 
@@ -69,16 +70,33 @@ ping_check() {
 
 new_cluster() {
   ping_check
-  echo "new join member ${HOSTNAME}"
+  echo "new cluster member ${HOSTNAME}"
   exec etcd --name ${HOSTNAME} --initial-advertise-peer-urls http://${HOSTNAME}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2380 --listen-peer-urls http://${POD_IP}:2380 --listen-client-urls http://${POD_IP}:2379,http://127.0.0.1:2379 --advertise-client-urls http://${HOSTNAME}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2379 --initial-cluster-token ${CLUSTER_TOKEN} --data-dir ${ETCD_DATA} --initial-cluster $(initial_peers) --initial-cluster-state new
 }
 
+restore() {
+  echo "restore etcd cluster data"
+  etcdctl snapshot restore ${BASEDIR}/etcd-snapshot.db  --name ${HOSTNAME} --initial-cluster-token ${CLUSTER_TOKEN} --data-dir ${ETCD_DATA} --initial-cluster $(initial_peers) --initial-advertise-peer-urls http://${HOSTNAME}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2380
+  if [ $? -ne 0 ];then
+    echo "restore etcd data failed."
+  fi
+  rm ${BASEDIR}/etcd-snapshot.db  && echo "remove ${BASEDIR}/etcd-snapshot.db"
+  echo "from restore to etcd start"
+  ping_check
+  exec etcd --name ${HOSTNAME} --initial-advertise-peer-urls http://${HOSTNAME}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2380 --listen-peer-urls http://${POD_IP}:2380 --listen-client-urls http://${POD_IP}:2379,http://127.0.0.1:2379 --advertise-client-urls http://${HOSTNAME}.${SERVICE_NAME}.${MY_NAMESPACE}.svc:2379 --initial-cluster-token ${CLUSTER_TOKEN} --data-dir ${ETCD_DATA} --initial-cluster $(initial_peers)
+}
+
 main() {
+  mkdir -p ${ETCD_DATA}
   SET_ID=${HOSTNAME##*-}
   if [ "${SET_ID}" -ge "${INITIAL_CLUSTER_SIZE}" ];then
     join_cluster
   else
-    new_cluster
+    if [ -f ${BASEDIR}/etcd-snapshot.db ];then
+      restore
+    else
+      new_cluster
+    fi
   fi
 }
 
